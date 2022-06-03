@@ -9,6 +9,7 @@ import torch
 import torch.optim as optim
 import yaml
 from omegaconf import OmegaConf
+from nerf.atlantic_datasets.block_selector import selectors
 
 
 def merge_config_file(config, config_path, allow_invalid=False):
@@ -98,36 +99,7 @@ if __name__ == "__main__":
         )
     else:
         raise Exception("Unsupported backend!")
-
-    train_dataset, valid_dataset, _ = Dataset(
-        bound=opt.bound,
-        **opt.data,
-    )
-    train_loader = torch.utils.data.DataLoader(
-        train_dataset, batch_size=1, shuffle=True
-    )
-    valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=1)
-
-    model = NeRFNetwork(
-        encoding="hashgrid"
-        if not opt.extrinsic.optimize_extrinsics
-        else "annealable_hashgrid",
-        bound=opt.bound,
-        cuda_ray=opt.cuda_ray,
-        n_views=train_dataset.n_views,
-        **opt.network,
-        **opt.extrinsic,
-    )
-    print(model)
-
-    # Train
-    if opt.renderer.z_far <= 0:
-        opt.renderer.z_far = float(train_dataset.depth_scale)
-
-    criterion = Criterion(opt.criterion)
-    metrics = Metric(opt.metrics)
-    sampler = Sampler(**opt.sampler, class_colors=train_dataset.class_colors)
-
+        
     # Optimizer
     def optimizer(model):
         param_groups = [
@@ -150,31 +122,61 @@ if __name__ == "__main__":
         return torch.optim.Adam(
             param_groups, lr=opt.optimizer.learning_rate, betas=(0.9, 0.99), eps=1e-15
         )
-
-    # Scheduler
-    lr_lambda = lambda epoch: opt.optimizer.lr_scheduler_gamma ** (
-        min(
-            opt.optimizer.lr_scheduler_steps,
-            epoch / opt.optimizer.lr_scheduler_step_size,
+    for subcase in range(len(selectors)):
+        opt.data.selector='kitti-sub'+format(str(subcase), '0>2s')
+        train_dataset, valid_dataset, _ = Dataset(
+            bound=opt.bound,
+            **opt.data,
         )
-    )
-    scheduler = lambda optimizer: optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+        train_loader = torch.utils.data.DataLoader(
+            train_dataset, batch_size=1, shuffle=True
+        )
+        valid_loader = torch.utils.data.DataLoader(valid_dataset, batch_size=1)
 
-    trainer = Trainer(
-        name="ngp",
-        conf=opt.renderer,
-        model=model,
-        workspace=workspace,
-        optimizer=optimizer,
-        criterion=criterion,
-        metrics=metrics,
-        ema_decay=0.95,
-        fp16=opt.fp16,
-        lr_scheduler=scheduler,
-        sampler=sampler,
-        use_checkpoint="latest",
-        eval_interval=opt.eval_interval,
-        depth_scale=train_dataset.depth_scale,
-    )
+        model = NeRFNetwork(
+            encoding="hashgrid"
+            if not opt.extrinsic.optimize_extrinsics
+            else "annealable_hashgrid",
+            bound=opt.bound,
+            cuda_ray=opt.cuda_ray,
+            n_views=train_dataset.n_views,
+            **opt.network,
+            **opt.extrinsic,
+        )
+        print(model)
 
-    trainer.train(train_loader, valid_loader, opt.num_epochs)
+        # Train
+        if opt.renderer.z_far <= 0:
+            opt.renderer.z_far = float(train_dataset.depth_scale)
+
+        criterion = Criterion(opt.criterion)
+        metrics = Metric(opt.metrics)
+        sampler = Sampler(**opt.sampler, class_colors=train_dataset.class_colors)
+
+        # Scheduler
+        lr_lambda = lambda epoch: opt.optimizer.lr_scheduler_gamma ** (
+            min(
+                opt.optimizer.lr_scheduler_steps,
+                epoch / opt.optimizer.lr_scheduler_step_size,
+            )
+        )
+        scheduler = lambda optimizer: optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+
+        trainer = Trainer(
+            name='kitti-sub'+format(str(subcase), '0>2s'),
+            conf=opt.renderer,
+            model=model,
+            workspace=workspace,
+            optimizer=optimizer,
+            criterion=criterion,
+            metrics=metrics,
+            ema_decay=0.95,
+            fp16=opt.fp16,
+            lr_scheduler=scheduler,
+            sampler=sampler,
+            use_checkpoint="latest",
+            eval_interval=opt.eval_interval,
+            depth_scale=train_dataset.depth_scale,
+        )
+
+        trainer.train(train_loader, valid_loader, opt.num_epochs)

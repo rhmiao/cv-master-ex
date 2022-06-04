@@ -455,7 +455,7 @@ class Trainer(object):
                         data["image"] = mix_background_color(data["image"], bg_color)
 
                 frame = self.visualize(preds, data)
-                path = os.path.join(save_path, f"{i:04d}.png")
+                path = os.path.join(save_path, f"{self.name}_{i:04d}.png")
                 cv2.imwrite(path, frame)
 
                 if "image" in data:

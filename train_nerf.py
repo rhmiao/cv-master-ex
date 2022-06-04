@@ -180,3 +180,4 @@ if __name__ == "__main__":
         )
 
         trainer.train(train_loader, valid_loader, opt.num_epochs)
+        print('kitti-sub'+format(str(subcase), '0>2s')+' is over!');

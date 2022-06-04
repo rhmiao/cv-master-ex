@@ -7,7 +7,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from .selector import selectors
+from .block_selector import selectors
 from .utils import normalize_cameras_by_pointcloud
 from .camera import CameraPoseTransform as CPT
 

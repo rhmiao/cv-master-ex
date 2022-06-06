@@ -8,6 +8,7 @@ import numpy as np
 import torch
 import yaml
 from omegaconf import OmegaConf
+from nerf.atlantic_datasets.block_selector import selectors
 
 
 def merge_config_file(config, config_path, allow_invalid=False):
@@ -78,44 +79,46 @@ if __name__ == "__main__":
         )
     else:
         raise Exception("Unsupported backend!")
+    
+    for subcase in range(len(selectors)):
+        opt.data.selector='kitti-sub'+format(str(subcase), '0>2s')
+        model = NeRFNetwork(
+	    encoding="hashgrid"
+	    if not opt.extrinsic.optimize_extrinsics
+	    else "annealable_hashgrid",
+            bound=opt.bound,
+            cuda_ray=opt.cuda_ray,
+            **opt.network,
+        )
+        print(model)
+        print('starint test kitti-sub'+format(str(subcase), '0>2s'));
+        # Test
+        metrics = Metric(opt.metrics)
 
-    model = NeRFNetwork(
-	encoding="hashgrid"
-	if not opt.extrinsic.optimize_extrinsics
-	else "annealable_hashgrid",
-        bound=opt.bound,
-        cuda_ray=opt.cuda_ray,
-        **opt.network,
-    )
-    print(model)
+        _, _, test_dataset = Dataset(
+            bound=opt.bound,
+            **opt.data,
+        )
+        test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
 
-    # Test
-    metrics = Metric(opt.metrics)
+        if opt.renderer.z_far <= 0:
+            opt.renderer.z_far = float(test_dataset.depth_scale)
 
-    _, _, test_dataset = Dataset(
-        bound=opt.bound,
-        **opt.data,
-    )
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
+        sampler = Sampler(**opt.sampler, class_colors=test_dataset.class_colors)
 
-    if opt.renderer.z_far <= 0:
-        opt.renderer.z_far = float(test_dataset.depth_scale)
+        trainer = Trainer(
+            name='kitti-sub'+format(str(subcase), '0>2s'),
+            conf=opt.renderer,
+            model=model,
+            metrics=metrics,
+            workspace=workspace,
+            fp16=opt.fp16,
+            sampler=sampler,
+            use_checkpoint="latest",
+            depth_scale=test_dataset.depth_scale,
+        )
 
-    sampler = Sampler(**opt.sampler, class_colors=test_dataset.class_colors)
-
-    trainer = Trainer(
-        name="ngp",
-        conf=opt.renderer,
-        model=model,
-        metrics=metrics,
-        workspace=workspace,
-        fp16=opt.fp16,
-        sampler=sampler,
-        use_checkpoint="latest",
-        depth_scale=test_dataset.depth_scale,
-    )
-
-    trainer.test(test_loader, alpha_premultiplied=opt.test.alpha_premultiplied)
+        trainer.test(test_loader, alpha_premultiplied=opt.test.alpha_premultiplied)
 
     # Video
     video_path = os.path.join(workspace, "video.webm")

@@ -120,30 +120,3 @@ if __name__ == "__main__":
 
         trainer.test(test_loader, alpha_premultiplied=opt.test.alpha_premultiplied)
 
-    # Video
-    video_path = os.path.join(workspace, "video.webm")
-    ffmpeg_bin = "ffmpeg"
-    frame_regexp = os.path.join(workspace, "results", "%04d.png")
-    pix_fmt = "yuva420p"
-    ffmcmd = (
-        '%s -r %d -i %s -vf pad="width=ceil(iw/2)*2:height=ceil(ih/2)*2" -c:v libvpx-vp9 -crf %d -b:v 0 -pix_fmt %s -y -an %s'
-        % (ffmpeg_bin, opt.test.fps, frame_regexp, opt.test.crf, pix_fmt, video_path)
-    )
-    ret = os.system(ffmcmd)
-    if ret != 0:
-        raise RuntimeError("ffmpeg failed!")
-
-    # Output
-    if opt.out != "":
-        if not opt.out.startswith("s3://"):
-            if os.path.isdir(opt.out):
-                opt.out = os.path.join(opt.out, f"{config_name}.webm")
-            shutil.copyfile(video_path, opt.out)
-        else:
-            if not opt.out.endswith(".webm"):
-                opt.out = os.path.join(opt.out, f"{config_name}.webm")
-            osscmd = f"aws --endpoint-url=http://oss.hh-b.brainpp.cn s3 cp {video_path} {opt.out}"
-            ret = os.system(osscmd)
-            if ret != 0:
-                raise RuntimeError("oss cp failed!")
-            print(f"Video path: http://oss.iap.hh-b.brainpp.cn/{opt.out[5:]}")

@@ -72,7 +72,8 @@ if __name__ == "__main__":
         for j in range(len(selectors)):
             name='kitti-sub'+format(str(j), '0>2s')
             if(i in selectors[name]['test']):
-                img_path=os.path.join(workspace, "results", f"{name}_{i:04d}.png")
+                index_i = selectors[name]['test'].index(i)
+                img_path=os.path.join(workspace, "results", f"{name}_{index_i:04d}.png")
                 img_path_list.append(img_path)
                 #calculate merge weight
                 weight = get_weight(i,selectors[name]['test'],poses)

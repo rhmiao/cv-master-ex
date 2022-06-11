@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import os
-from dataset_kitti_odometry import KITTI_Odometry
+from .dataset_kitti_odometry import KITTI_Odometry
 
 scene = "00"
 evalset = KITTI_Odometry(scene=scene)

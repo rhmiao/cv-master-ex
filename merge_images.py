@@ -36,9 +36,10 @@ def get_weight(reference_id,target_block,img_poses):
         dis = np.linalg.norm(target_pose[:3]-reference_pose[:3],2)
         target_R=scipy.spatial.transform.Rotation.from_quat(target_pose[[4, 5, 6, 3]]).as_matrix()
         reference_R=scipy.spatial.transform.Rotation.from_quat(reference_pose[[4, 5, 6, 3]]).as_matrix()
-        delta_R=target_R..transpose()*reference_R
-        cosine_yaw=(delta_R.trace()-1)/2
-        weight_sum += cosine_yaw/(1+dis)
+        delta_R=target_R.transpose()*reference_R
+        cosine_yaw=(delta_R.trace()+1)/2#(cos \thta +1)
+        if(cosine_yaw>0):
+            weight_sum += cosine_yaw/((1+dis)*(1+dis)+0.1)
     return weight_sum
         
  
@@ -65,24 +66,26 @@ if __name__ == "__main__":
     save_path_root = os.path.join(workspace, "final_results")
     os.makedirs(save_path_root, exist_ok=True)
     for i in range(n_images):
+        print("image:",i)
         img_path_list=[]
         merge_weights=[]
         weight_sum=0
         merge_img=None
         for j in range(len(selectors)):
             name='kitti-sub'+format(str(j), '0>2s')
-            if(i in selectors[name]['test']):
-                index_i = selectors[name]['test'].index(i)
+            block = selectors[name]['test'](100)
+            if(i in block):
+                index_i = block.index(i)
                 img_path=os.path.join(workspace, "results", f"{name}_{index_i:04d}.png")
                 img_path_list.append(img_path)
                 #calculate merge weight
-                weight = get_weight(i,selectors[name]['test'],poses)
+                weight = get_weight(i,block,poses)
                 merge_weights.append(weight)
                 img = cv2.imread(img_path).astype("float32")
                 
                 weight_sum += weight
                 if(merge_img is None):
-                    merge_img = img
+                    merge_img = weight * img
                 else:
                     merge_img += weight * img
         #merge image
